@@ -15,15 +15,17 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-	print(message.mentions, message.content)
-	if client.user not in message.mentions:
-		return
+	print(message)
+	print(message.author, message.mentions, message.content)
 
-	await message.channel.send('You summoned me?')
+	if message.author == client.user:
+		return
+	
+	if client.user in message.mentions:
+		await message.channel.send('sup?')
+
+	# Dar targeting code
+	# if str(message.author) == "darr#1908":
+	# 	await message.add_reaction("<:dar:799348728632705064>")
 
 client.run(os.getenv('TOKEN'))
-# def main():
-# 	''' main docstring '''
-
-# if __name__ == "__main__":
-# 	main()
