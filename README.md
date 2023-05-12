@@ -1,13 +1,14 @@
-# <placeholder name>
+# <ChadBot>
 
-<description of project>
+It's a Discord bot
 
 ## Installation
 
 <describe installation process>
 
 ```<language>
-<install example>
+python3 venv -m env
+pip3 install -r requirements.txt
 ```
 ## Usage
 
