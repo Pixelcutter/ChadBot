@@ -4,6 +4,7 @@ import dotenv
 import os
 import pandas as pd
 import sqlite3
+import MessageRater
 
 dotenv.load_dotenv()
 
@@ -22,8 +23,26 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
+rater = MessageRater.Rater()
 
 client = commands.Bot(command_prefix='!', intents=intents)
+
+# dumb function that returns a fixed message based on rating
+def get_rating_message(rating):
+	msg = ""
+	if rating == 0:
+		msg = "Average take..."
+	elif rating < 0:
+		if rating > -5:
+			msg = "Bad take"
+		else:
+			msg = "Shit take. Consider deleting message"
+	else:
+		if rating < 5:
+			msg = "Good take"
+		else:
+			msg = "God-tier take. Pin it"
+	return msg
 
 @client.event
 async def on_ready():
@@ -31,14 +50,12 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-	print(message)
-	print(message.author, message.mentions, message.content)
-
+	# print(message.author, message.mentions, message.content)
 	if message.author == client.user:
 		return
 
-	if client.user in message.mentions:
-		await message.channel.send('sup?')
+	# if client.user in message.mentions:
+	# 	await message.channel.send('sup?')
 
 	# Run commands with the message
 	await client.process_commands(message)
@@ -46,6 +63,20 @@ async def on_message(message):
 	# Dar targeting code
 	# if str(message.author) == "darr#1908":
 	#     await message.add_reaction("<:dar:799348728632705064>")
+
+# grabs server specific emojis and prints them to stdout
+@client.command(name='emojis')
+async def get_emojis(ctx):
+	for emoji in ctx.guild.emojis:
+		print(str(emoji))
+
+# command that rates a channel message thats been replied to by its reactions
+@client.command(name='rate')
+async def rate_command(ctx):
+	original_msg = await ctx.fetch_message(ctx.message.reference.message_id)
+	rating = rater.get_sentiment(original_msg)
+	# print(rating) # debug message for rating 
+	await ctx.send(get_rating_message(rating))
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):

@@ -19,40 +19,38 @@ class ChadbotDB:
 def main():
     db = ChadbotDB()
     db.save_reaction("some reaction")
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS guilds(
-                         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                         name TEXT
+    db.cursor.execute("""CREATE TABLE guilds(
+                         id INTEGER PRIMARY KEY, 
+                         name TEXT, 
+                         member_count INTEGER
                          )"""
                      )
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS channels(
-                         id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    db.cursor.execute("""CREATE TABLE channels(
+                         id INTEGER PRIMARY KEY, 
                          name TEXT, 
                          guild_id INTEGER
                          )"""
                      )
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS messages(
-                         id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    db.cursor.execute("""CREATE TABLE messages(
+                         id INTEGER PRIMARY KEY, 
                          channel_id INTEGER, 
                          content TEXT, 
                          created_at TEXT, 
                          sentiment INTEGER
                          )"""
                      )
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS reactions(
+    db.cursor.execute("""CREATE TABLE reactions(
                          id INTEGER PRIMARY KEY AUTOINCREMENT, 
                          message_id INTEGER, 
-                         emoji TEXT, 
+                         emoji_id INTEGER, 
                          count INTEGER
                          )"""
                      )
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS guild_emojis(
+    db.cursor.execute("""CREATE TABLE emojis(
+                         id INTEGER PRIMARY KEY, 
                          guild_id INTEGER, 
                          emoji TEXT, 
-                         sentiment INTEGER
-                         )"""
-                     )
-    db.cursor.execute("""CREATE TABLE IF NOT EXISTS generic_emojis(
-                         emoji TEXT, 
+                         url TEXT,
                          sentiment INTEGER
                          )"""
                      )
