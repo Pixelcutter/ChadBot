@@ -3,6 +3,7 @@ from discord.ext import commands
 import dotenv
 import os
 import pandas as pd
+import sqlite3
 
 dotenv.load_dotenv()
 
