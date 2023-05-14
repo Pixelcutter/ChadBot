@@ -10,12 +10,8 @@ class Rater:
         total_score = 0
 
         for reaction in message.reactions:
-            # if str(reaction.emoji) not in self.sentiments:
-            #     print("skipping", str(reaction.emoji))
-            #     continue
-
             count = reaction.count
-            # emoji_id = reaction.emoji.id if reaction.is_custom_emoji() else
+
             score = self.db.fetch_by_emoji_id(reaction.emoji.id) \
                     if reaction.is_custom_emoji() \
                     else self.db.fetch_by_emoji(reaction.emoji)
