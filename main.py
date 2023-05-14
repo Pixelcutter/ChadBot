@@ -33,12 +33,12 @@ def get_rating_message(rating):
 	if rating == 0:
 		msg = "Average take..."
 	elif rating < 0:
-		if rating > -5:
+		if rating > -0.5:
 			msg = "Bad take"
 		else:
 			msg = "Shit take. Consider deleting message"
 	else:
-		if rating < 5:
+		if rating < 0.5:
 			msg = "Good take"
 		else:
 			msg = "God-tier take. Pin it"
@@ -64,11 +64,18 @@ async def on_message(message):
 	# if str(message.author) == "darr#1908":
 	#     await message.add_reaction("<:dar:799348728632705064>")
 
-# grabs server specific emojis and prints them to stdout
+# grabs server specific emojis and saves them to database table: emoji_sentiments
 @client.command(name='emojis')
 async def get_emojis(ctx):
-	for emoji in ctx.guild.emojis:
-		print(str(emoji))
+	with sqlite3.connect("chadbot.db") as db:
+		cursor = db.cursor()
+		tuples = [(emoji.id, str(emoji), 0.0, emoji.name, ctx.guild.id, emoji.url) for emoji in ctx.guild.emojis]
+		try:
+			cursor.executemany('INSERT INTO emoji_sentiments (id, emoji, sentiment_score, name, guild_id, url) VALUES (?, ?, ?, ?, ?, ?)', tuples)
+			db.commit()
+		except discord.ext.commands.errors.CommandInvokeError:
+			print(discord.ext.commands.errors.CommandInvokeError)
+
 
 # command that rates a channel message thats been replied to by its reactions
 @client.command(name='rate')
