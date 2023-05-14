@@ -1,11 +1,11 @@
 import sqlite3
 import discord
+import models
 from discord.ext import commands
 
 # emojis from ayy lmao and chadbot sanctuary
 # 0 = neutral
-# -1 = negative
-# 1 = positive
+# negative < 0 > positive
 sentiments = {
             "<:dar:799348728632705064>": -1,
             "<:maki:695456102506299404>": 1,
@@ -83,17 +83,13 @@ class ChadbotDB:
         self.conn = sqlite3.connect("chadbot.db")
         self.cursor = self.conn.cursor()
 
-    def fetch_by_emoji(self, emoji: str) -> float:
-        print(emoji)
-        res = self.cursor.execute(f"SELECT sentiment_score FROM emoji_sentiments WHERE emoji = '{emoji}'")
-        sentiment = self.cursor.fetchone()
-        return sentiment[0] if sentiment else 0.0
+    def fetch_emoji_by_str(self, emoji: str) -> models.Emoji:
+        res = self.cursor.execute(f"SELECT * FROM emoji_sentiments WHERE emoji = '{emoji}'").fetchone()
+        return models.Emoji(*res) if res else None
 
-    def fetch_by_emoji_id(self, emoji_id: int) -> float:
-        print(emoji_id)
-        res = self.cursor.execute(f"SELECT sentiment_score FROM emoji_sentiments WHERE id = '{emoji_id}'")
-        sentiment = self.cursor.fetchone()
-        return sentiment[0] if sentiment else 0.0
+    def fetch_emoji_by_id(self, emoji_id: int) -> models.Emoji:
+        res = self.cursor.execute(f"SELECT * FROM emoji_sentiments WHERE id = '{emoji_id}'").fetchone()
+        return models.Emoji(*res) if res else None
 
     def save_reaction(self, reaction: discord.Reaction) -> bool:
         print(reaction)
@@ -106,27 +102,26 @@ class ChadbotDB:
 # only for testing
 def main():
     db = ChadbotDB()
-    db.fetch_emoji_sentiment(128675)
     # call after manually changing sentiment scores in sentiments dict
     # save_server_emoji_sentiments(db)
 
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS guilds(
-    #                      id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    #                      id INTEGER PRIMARY KEY, 
     #                      name TEXT
     #                      )"""
     #                  )
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS channels(
-    #                      id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    #                      id INTEGER PRIMARY KEY, 
     #                      name TEXT, 
     #                      guild_id INTEGER
     #                      )"""
     #                  )
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS messages(
-    #                      id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    #                      id INTEGER PRIMARY KEY, 
     #                      channel_id INTEGER, 
     #                      content TEXT, 
     #                      created_at TEXT, 
-    #                      sentiment INTEGER
+    #                      emoji_sentiment REAL
     #                      )"""
     #                  )
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS reactions(

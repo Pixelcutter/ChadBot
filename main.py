@@ -81,9 +81,9 @@ async def get_emojis(ctx):
 @client.command(name='rate')
 async def rate_command(ctx):
 	original_msg = await ctx.fetch_message(ctx.message.reference.message_id)
-	rating = rater.get_sentiment(original_msg)
-	# print(rating) # debug message for rating 
-	await ctx.send(get_rating_message(rating))
+	score = rater.calculate_message_score(original_msg)
+	# print(score) # debug message for score
+	await ctx.send(get_rating_message(score))
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):
