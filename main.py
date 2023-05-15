@@ -4,7 +4,7 @@ import dotenv
 import os
 import pandas as pd
 import sqlite3
-import MessageRater
+import SentimentAnalyzer
 
 dotenv.load_dotenv()
 
@@ -23,9 +23,17 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
-rater = MessageRater.Rater()
+analyzer = SentimentAnalyzer.Analyzer()
 
 client = commands.Bot(command_prefix='!', intents=intents)
+
+async def send_toxicity_report(message: discord.Message, predictions: dict):
+	embedVar = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
+	for key, val in predictions.items():
+		if val == True:
+			embedVar.add_field(name=key.replace('_', ' ').title(), value=val)
+	await message.reply(embed=embedVar)
+
 
 # dumb function that returns a fixed message based on rating
 def get_rating_message(rating):
@@ -57,6 +65,14 @@ async def on_message(message):
 	# if client.user in message.mentions:
 	# 	await message.channel.send('sup?')
 
+	# checks incoming messages for toxicity and prints a report if they are
+	if message.content.startswith("!") == False:
+		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
+		if toxicity_prediction['is_toxic']:
+			await send_toxicity_report(message, toxicity_prediction['predictions'])
+			
+		
+
 	# Run commands with the message
 	await client.process_commands(message)
 
@@ -80,8 +96,13 @@ async def get_emojis(ctx):
 # command that rates a channel message thats been replied to by its reactions
 @client.command(name='rate')
 async def rate_command(ctx):
-	original_msg = await ctx.fetch_message(ctx.message.reference.message_id)
-	score = rater.calculate_message_score(original_msg)
+	ref = ctx.message.reference
+	if ref == None:
+		await ctx.send("I cannot rate messages without reactions")
+		return 
+	
+	original_msg = await ctx.fetch_message(ref.message_id)
+	score = analyzer.calculate_emoji_sentiment(original_msg)
 	# print(score) # debug message for score
 	await ctx.send(get_rating_message(score))
 
