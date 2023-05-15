@@ -31,7 +31,8 @@ async def send_toxicity_report(message: discord.Message, predictions: dict):
 	embedVar = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
 	for key, val in predictions.items():
 		if val == True:
-			embedVar.add_field(name=key.replace('_', ' ').title(), value=val)
+			embedVar.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
+	await message.add_reaction("☣️")
 	await message.reply(embed=embedVar)
 
 
