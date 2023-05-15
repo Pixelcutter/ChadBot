@@ -28,12 +28,13 @@ analyzer = SentimentAnalyzer.Analyzer()
 client = commands.Bot(command_prefix='!', intents=intents)
 
 async def send_toxicity_report(message: discord.Message, predictions: dict):
-	embedVar = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
+	embed_var = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
+	embed_var.url = "https://www.verywellmind.com/mental-health-effects-of-reading-negative-comments-online-5090287"
 	for key, val in predictions.items():
 		if val == True:
-			embedVar.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
+			embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
 	await message.add_reaction("☣️")
-	await message.reply(embed=embedVar)
+	await message.reply(embed=embed_var)
 
 
 # dumb function that returns a fixed message based on rating
@@ -99,12 +100,11 @@ async def get_emojis(ctx):
 async def rate_command(ctx):
 	ref = ctx.message.reference
 	if ref == None:
-		await ctx.send("I cannot rate messages without reactions")
+		await ctx.send("There is nothing to rate...")
 		return 
 	
 	original_msg = await ctx.fetch_message(ref.message_id)
 	score = analyzer.calculate_emoji_sentiment(original_msg)
-	# print(score) # debug message for score
 	await ctx.send(get_rating_message(score))
 
 @client.command(name='scan')
