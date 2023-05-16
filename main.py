@@ -2,9 +2,9 @@ import discord
 from discord.ext import commands
 import dotenv
 import os
-import pandas as pd
 import sqlite3
-import MessageRater
+import SentimentAnalyzer
+import ChadbotCRUD
 
 dotenv.load_dotenv()
 
@@ -23,9 +23,18 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
-rater = MessageRater.Rater()
+db = ChadbotCRUD.CRUD()
+analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"), threshold=0.6)
 
 client = commands.Bot(command_prefix='!', intents=intents)
+
+async def send_toxicity_report(message: discord.Message, predictions: dict):
+	embed_var = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
+	embed_var.url = "https://www.verywellmind.com/mental-health-effects-of-reading-negative-comments-online-5090287"
+	for key, val in predictions.items():
+		embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
+	await message.reply(embed=embed_var)
+
 
 # dumb function that returns a fixed message based on rating
 def get_rating_message(rating):
@@ -57,6 +66,16 @@ async def on_message(message):
 	# if client.user in message.mentions:
 	# 	await message.channel.send('sup?')
 
+	# checks incoming messages for toxicity and prints a report if they are
+	if message.content.startswith("!") == False:
+		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
+		if len(toxicity_prediction["attributeScores"]) > 0:
+			await message.add_reaction("☣️")
+			db.save_message(message, is_toxic=True)
+			# await send_toxicity_report(message, toxicity_prediction["attributeScores"])
+			
+		
+
 	# Run commands with the message
 	await client.process_commands(message)
 
@@ -80,10 +99,22 @@ async def get_emojis(ctx):
 # command that rates a channel message thats been replied to by its reactions
 @client.command(name='rate')
 async def rate_command(ctx):
-	original_msg = await ctx.fetch_message(ctx.message.reference.message_id)
-	rating = rater.get_sentiment(original_msg)
-	# print(rating) # debug message for rating 
-	await ctx.send(get_rating_message(rating))
+	ref = ctx.message.reference
+	if ref == None:
+		await ctx.send("There is nothing to rate...")
+		return 
+	
+	original_msg = await ctx.fetch_message(ref.message_id)
+	score = analyzer.calculate_emoji_sentiment(original_msg)
+	await ctx.send(get_rating_message(score))
+
+# Test function. Put whatever you want in here
+@client.command(name="test")
+async def test(ctx):
+	print(ctx.message)
+	og = await ctx.fetch_message(ctx.message.reference.message_id)
+	db.save_message(og)
+	
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):
