@@ -83,21 +83,12 @@ class CRUD:
         self.conn = sqlite3.connect("chadbot.db")
         self.cursor = self.conn.cursor()
 
-    def fetch_emoji(self, reaction: discord.Reaction):
+    def fetch_emoji(self, reaction: discord.Reaction) -> models.Emoji:
         sql = f"SELECT * FROM emoji_sentiments WHERE id = '{reaction.emoji.id}'" \
               if reaction.is_custom_emoji() \
-              else f"SELECT * FROM emoji_sentiments WHERE emoji = '{reaction.emoji}'"
+              else f"SELECT * FROM emoji_sentiments WHERE id = '{sum([ord(char) for char in reaction.emoji])}'"
         
         res = self.cursor.execute(sql).fetchone()
-        return models.Emoji(*res) if res else None
-
-
-    def fetch_generic_emoji(self, emoji: str) -> models.Emoji:
-        res = self.cursor.execute(f"SELECT * FROM emoji_sentiments WHERE emoji = '{emoji}'").fetchone()
-        return models.Emoji(*res) if res else None
-    
-    def fetch_custom_emoji(self, emoji_id: int) -> models.Emoji:
-        res = self.cursor.execute(f"SELECT * FROM emoji_sentiments WHERE id = '{emoji_id}'").fetchone()
         return models.Emoji(*res) if res else None
 
     def save_emoji(self, reaction: discord.Reaction) -> bool:
@@ -107,29 +98,62 @@ class CRUD:
             return False
         
         emoji = reaction.emoji
-        tup = (emoji.id, str(emoji), 0.0, emoji.name, ctx.guild.id, emoji.url) \
+        tup = (emoji.id, str(emoji), 0.0, emoji.name, reaction.message.guild.id, emoji.url) \
               if reaction.is_custom_emoji() \
-              else (generic.id, emoji, 0.0, "generic", 0, None)
+              else (sum([ord(char) for char in emoji]), emoji, 0.0, "generic", 0, None)
+
         self.cursor.execute("""
                             INSERT INTO emoji_sentiments (id, emoji, sentiment_score, name, guild_id, url) 
                             VALUES (?, ?, ?, ?, ?, ?)
                             """, tup)
         self.conn.commit()
-
-    def save_custom_emoji(self, reaction: discord.Reaction) -> bool:
-        pass
+        return True
 
     def fetch_user(self, user_id: int) -> models.User:
-        pass
+        sql = f"SELECT * FROM users WHERE id = '{user_id}'"        
+        res = self.cursor.execute(sql).fetchone()
+        return models.User(*res) if res else None
 
-    def save_user(self, user: discord.User) -> bool:
-        pass
+    def save_user(self, user: discord.User, msg_count: int = 0, toxic_msg_count: int = 0, toxicity_score: int = 0) -> bool:
+        db_has_user = self.fetch_emoji(user.id)
 
-    def fetch_message(self, message: discord.Message) -> models.Message:
-        pass
+        if db_has_user:
+            return False
+        
+        tup = (user.id, user.name, user.display_avatar, msg_count, toxic_msg_count, toxicity_score)
+        self.cursor.execute("""
+                            INSERT INTO users (id, name, display_avatar, msg_count, toxic_msg_count, toxicity_score) 
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """, tup)
+        self.conn.commit()
+        return True
 
-    def save_message(self, message: discord.Message) -> bool:
-        pass
+    def fetch_message(self, msg_id: int) -> models.Message:
+        sql = f"SELECT * FROM messages WHERE id = '{msg_id}'"        
+        res = self.cursor.execute(sql).fetchone()
+        return models.Message(*res) if res else None
+
+    def save_message(self, message: discord.Message, is_toxic: bool =False) -> bool:
+        db_has_msg = self.fetch_emoji(message.id)
+
+        if db_has_msg:
+            return False
+        
+        tup = ( message.id, 
+                message.author.id, 
+                message.channel.id, 
+                message.channel.guild_id, 
+                message.content,
+                message.created_at,
+                message.jump_url,
+                is_toxic )
+        
+        self.cursor.execute("""
+                            INSERT INTO messages (id, author_id, channel_id, guild_id, text, created_at, jump_url, is_toxic) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """, tup)
+        self.conn.commit()
+        return True
 
     
 
@@ -148,14 +172,6 @@ def main():
     #                      id INTEGER PRIMARY KEY, 
     #                      name TEXT, 
     #                      guild_id INTEGER
-    #                      )"""
-    #                  )
-    # db.cursor.execute("""CREATE TABLE IF NOT EXISTS messages(
-    #                      id INTEGER PRIMARY KEY, 
-    #                      channel_id INTEGER, 
-    #                      content TEXT, 
-    #                      created_at TEXT, 
-    #                      is_toxic INTEGER
     #                      )"""
     #                  )
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS reactions(

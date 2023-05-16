@@ -16,10 +16,7 @@ class Analyzer:
         total_score = 0
 
         for reaction in message.reactions:
-            emoji = self.db.fetch_custom_emoji(reaction.emoji.id) \
-                    if reaction.is_custom_emoji() \
-                    else self.db.fetch_generic_emoji(reaction.emoji)
-            
+            emoji = self.db.fetch_emoji(reaction)            
             count = reaction.count
             score = emoji.sentiment_score if emoji else 0
             total_score += (score * math.log(count + 1, 2))
@@ -31,7 +28,7 @@ class Analyzer:
         print(results)
         re_dict = {"is_toxic": False, "predictions": {}}
         for key, val in results.items():
-            if val > 0.5:
+            if val > 0.6:
                 re_dict["predictions"][key] = True
                 re_dict["is_toxic"] = True
             else:

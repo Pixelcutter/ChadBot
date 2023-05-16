@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import sqlite3
 import SentimentAnalyzer
+import ChadbotCRUD
 
 dotenv.load_dotenv()
 
@@ -24,6 +25,7 @@ class Message:
 intents = discord.Intents.default()
 intents.message_content = True
 analyzer = SentimentAnalyzer.Analyzer()
+db = ChadbotCRUD.CRUD()
 
 client = commands.Bot(command_prefix='!', intents=intents)
 
@@ -114,7 +116,8 @@ async def test(ctx):
 	og = await ctx.fetch_message(ctx.message.reference.message_id)
 	reactions = og.reactions
 	for emoji in reactions:
-		print(emoji)
+		stored_emoji = db.fetch_emoji(emoji)
+		await ctx.message.add_reaction(stored_emoji.emoji)
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):
