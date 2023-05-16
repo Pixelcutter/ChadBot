@@ -114,8 +114,8 @@ class CRUD:
         res = self.cursor.execute(sql).fetchone()
         return models.User(*res) if res else None
 
-    def save_user(self, user: discord.User, msg_count: int = 0, toxic_msg_count: int = 0, toxicity_score: int = 0) -> bool:
-        db_has_user = self.fetch_emoji(user.id)
+    def save_user(self, user: models.User, msg_count: int = 0, toxic_msg_count: int = 0, toxicity_score: int = 0) -> bool:
+        db_has_user = self.fetch_user(user.id)
 
         if db_has_user:
             return False
@@ -133,8 +133,8 @@ class CRUD:
         res = self.cursor.execute(sql).fetchone()
         return models.Message(*res) if res else None
 
-    def save_message(self, message: discord.Message, is_toxic: bool =False) -> bool:
-        db_has_msg = self.fetch_emoji(message.id)
+    def save_message(self, message: discord.Message, is_toxic: bool = False) -> bool:
+        db_has_msg = self.fetch_message(message.id)
 
         if db_has_msg:
             return False
@@ -142,7 +142,7 @@ class CRUD:
         tup = ( message.id, 
                 message.author.id, 
                 message.channel.id, 
-                message.channel.guild_id, 
+                message.channel.guild.id, 
                 message.content,
                 message.created_at,
                 message.jump_url,
@@ -159,7 +159,8 @@ class CRUD:
 
 # only for testing
 def main():
-    db = CRUD()
+    pass
+    # db = CRUD()
     # call after manually changing sentiment scores in sentiments dict
     # save_server_emoji_sentiments(db)
 

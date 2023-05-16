@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 import dotenv
 import os
-import pandas as pd
 import sqlite3
 import SentimentAnalyzer
 import ChadbotCRUD
@@ -24,8 +23,8 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
-analyzer = SentimentAnalyzer.Analyzer()
 db = ChadbotCRUD.CRUD()
+analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"), threshold=0.6)
 
 client = commands.Bot(command_prefix='!', intents=intents)
 
@@ -33,8 +32,7 @@ async def send_toxicity_report(message: discord.Message, predictions: dict):
 	embed_var = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
 	embed_var.url = "https://www.verywellmind.com/mental-health-effects-of-reading-negative-comments-online-5090287"
 	for key, val in predictions.items():
-		if val == True:
-			embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
+		embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
 	await message.reply(embed=embed_var)
 
 
@@ -71,9 +69,10 @@ async def on_message(message):
 	# checks incoming messages for toxicity and prints a report if they are
 	if message.content.startswith("!") == False:
 		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
-		if toxicity_prediction['is_toxic']:
+		if len(toxicity_prediction["attributeScores"]) > 0:
 			await message.add_reaction("☣️")
-			# await send_toxicity_report(message, toxicity_prediction['predictions'])
+			db.save_message(message, is_toxic=True)
+			# await send_toxicity_report(message, toxicity_prediction["attributeScores"])
 			
 		
 
@@ -114,10 +113,8 @@ async def rate_command(ctx):
 async def test(ctx):
 	print(ctx.message)
 	og = await ctx.fetch_message(ctx.message.reference.message_id)
-	reactions = og.reactions
-	for emoji in reactions:
-		stored_emoji = db.fetch_emoji(emoji)
-		await ctx.message.add_reaction(stored_emoji.emoji)
+	db.save_message(og)
+	
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):

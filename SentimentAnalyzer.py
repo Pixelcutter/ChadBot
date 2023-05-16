@@ -1,13 +1,17 @@
-import ChadbotCRUD
 import math
-import pandas as pd
-import numpy as np
-from detoxify import Detoxify
+from googleapiclient import discovery
 
 class Analyzer:
-    def __init__(self):
-        self.db = ChadbotCRUD.CRUD()
-        pass
+    def __init__(self, db, api_key: str, threshold: float):
+        self.threshold = threshold
+        self.db = db
+        self.api_client = discovery.build(
+            "commentanalyzer",
+            "v1alpha1",
+            developerKey=api_key,
+            discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+            static_discovery=False,
+            )
     
     def calculate_emoji_sentiment(self, message):
         if len(message.reactions) == 0:
@@ -24,33 +28,26 @@ class Analyzer:
         return total_score / len(message.reactions)
     
     def predict_message_toxicity(self, message) -> dict:
-        results = Detoxify('unbiased').predict(message)
-        print(results)
-        re_dict = {"is_toxic": False, "predictions": {}}
-        for key, val in results.items():
-            if val > 0.6:
-                re_dict["predictions"][key] = True
-                re_dict["is_toxic"] = True
-            else:
-                re_dict["predictions"][key] = False
+        attributes = {
+            'TOXICITY': { 'scoreThreshold': self.threshold }, 
+            'SEVERE_TOXICITY': { 'scoreThreshold': self.threshold }, 
+            'INSULT': { 'scoreThreshold': self.threshold }, 
+            'IDENTITY_ATTACK': { 'scoreThreshold': self.threshold }, 
+            'THREAT': { 'scoreThreshold': self.threshold }
+            }
+        
+        analyze_request = {
+            'comment': { 'text': message },
+            'languages': ["en"],
+            'requestedAttributes': attributes
+            }
 
-        return re_dict
+        response = self.api_client.comments().analyze(body=analyze_request).execute()
+        return response
 
 
 def main():
     pass
-    # test code
-    # analyzer = Analyzer()
-    # results = analyzer.predict_message_toxicity("I will kill your mother")
-    # for key, val in results["predictions"].items():
-        
-    # results = Detoxify('unbiased').predict(['Plot twist: I was the stabber'])
-    # print(results)
-    # df = pd.DataFrame(results)
-    
-    # # binary representation of true and false
-    # df = (df > 0.5) * 1
-    # print(df)
 
 if __name__ == "__main__":
     main()
