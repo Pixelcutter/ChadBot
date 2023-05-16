@@ -1,4 +1,4 @@
-import Crud
+import ChadbotCRUD
 import math
 import pandas as pd
 import numpy as np
@@ -6,16 +6,16 @@ from detoxify import Detoxify
 
 class Rater:
     def __init__(self):
-        self.db = Crud.ChadbotDB()
+        self.db = ChadbotCRUD.CRUD()
         pass
     
     def calculate_message_score(self, message):
         total_score = 0
 
         for reaction in message.reactions:
-            emoji = self.db.fetch_emoji_by_id(reaction.emoji.id) \
+            emoji = self.db.fetch_custom_emoji(reaction.emoji.id) \
                     if reaction.is_custom_emoji() \
-                    else self.db.fetch_emoji_by_str(reaction.emoji)
+                    else self.db.fetch_generic_emoji(reaction.emoji)
             
             count = reaction.count
             score = emoji.sentiment_score if emoji else 0

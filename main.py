@@ -33,7 +33,6 @@ async def send_toxicity_report(message: discord.Message, predictions: dict):
 	for key, val in predictions.items():
 		if val == True:
 			embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
-	await message.add_reaction("☣️")
 	await message.reply(embed=embed_var)
 
 
@@ -71,7 +70,8 @@ async def on_message(message):
 	if message.content.startswith("!") == False:
 		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
 		if toxicity_prediction['is_toxic']:
-			await send_toxicity_report(message, toxicity_prediction['predictions'])
+			await message.add_reaction("☣️")
+			# await send_toxicity_report(message, toxicity_prediction['predictions'])
 			
 		
 
@@ -106,6 +106,15 @@ async def rate_command(ctx):
 	original_msg = await ctx.fetch_message(ref.message_id)
 	score = analyzer.calculate_emoji_sentiment(original_msg)
 	await ctx.send(get_rating_message(score))
+
+# Test function. Put whatever you want in here
+@client.command(name="test")
+async def test(ctx):
+	print(ctx.message)
+	og = await ctx.fetch_message(ctx.message.reference.message_id)
+	reactions = og.reactions
+	for emoji in reactions:
+		print(emoji)
 
 @client.command(name='scan')
 async def scan_command(ctx, channel_name: str):
