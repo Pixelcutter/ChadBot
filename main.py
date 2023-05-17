@@ -39,15 +39,15 @@ async def send_toxicity_report(message: discord.Message, predictions: dict):
 # dumb function that returns a fixed message based on rating
 def get_rating_message(rating):
 	msg = ""
-	if rating == 0:
+	if rating >= -0.6 and rating <= 0.6:
 		msg = "Average take..."
-	elif rating < 0:
-		if rating > -0.5:
+	elif rating < -0.6:
+		if rating > -0.9:
 			msg = "Bad take"
 		else:
 			msg = "Shit take. Consider deleting message"
 	else:
-		if rating < 0.5:
+		if rating < 0.9:
 			msg = "Good take"
 		else:
 			msg = "God-tier take. Pin it"
