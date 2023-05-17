@@ -115,9 +115,15 @@ async def rate_command(ctx):
 # Test function. Put whatever you want in here
 @client.command(name="test")
 async def test(ctx):
-	print(ctx.message)
+	toxic_dict = {}
+	toxic_dict['toxicity'] = 1
+	toxic_dict['severe_toxic'] = 1
+	toxic_dict['threat'] = 1
+	toxic_dict['insult'] = 1
+	toxic_dict['identity_hate'] = 1
+
 	og = await ctx.fetch_message(ctx.message.reference.message_id)
-	db.save_message(og)
+	await db.save_message(og, toxic_dict)
 	
 
 @client.command(name='scan')

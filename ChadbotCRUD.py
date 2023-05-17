@@ -148,11 +148,12 @@ class CRUD:
         
         reactions_dict = {"reactions": []}
         for r in message.reactions:
+            users = r.users()
             reactions_dict['reactions'].append(
                 {
                     "emoji": str(r.emoji),
                     "count": r.count,
-                    "users": [user.id for user in await r.users()]
+                    "users": [user.id async for user in users]
                 })
         
         tup = ( message.id, 
