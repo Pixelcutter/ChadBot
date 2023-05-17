@@ -23,8 +23,9 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
+toxic_threshold = 0.6
 db = ChadbotCRUD.CRUD()
-analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"), threshold=0.6)
+analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"), threshold=toxic_threshold)
 
 client = commands.Bot(command_prefix='!', intents=intents)
 
@@ -71,7 +72,10 @@ async def on_message(message):
 		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
 		if len(toxicity_prediction["attributeScores"]) > 0:
 			await message.add_reaction("☣️")
-			db.save_message(message, is_toxic=True)
+			toxic_dict = {}
+			for key, val in toxicity_prediction['attributeScores'].items():
+				toxic_dict[key.lower()] = 1 if val['summaryScore']['value'] > toxic_threshold else 0
+			await db.save_message(message, toxic_dict=toxic_dict)
 			# await send_toxicity_report(message, toxicity_prediction["attributeScores"])
 			
 		

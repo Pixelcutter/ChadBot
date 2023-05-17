@@ -27,5 +27,10 @@ class Message():
     text: str
     created_at: str
     jump_url: str
-    is_toxic: int = 0
+    reactions: str = ""
+    toxicity: int = 0
+    severe_toxic: int = 0
+    threat: int = 0
+    insult: int = 0
+    identity_hate: int = 0
 

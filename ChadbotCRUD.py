@@ -1,5 +1,6 @@
 import sqlite3
 import discord
+import json
 import models
 from discord.ext import commands
 
@@ -131,13 +132,28 @@ class CRUD:
     def fetch_message(self, msg_id: int) -> models.Message:
         sql = f"SELECT * FROM messages WHERE id = '{msg_id}'"        
         res = self.cursor.execute(sql).fetchone()
-        return models.Message(*res) if res else None
+        
+        if res == None:
+            return None
 
-    def save_message(self, message: discord.Message, is_toxic: bool = False) -> bool:
+        msg = models.Message(*res)
+        msg.reactions = json.loads(msg.reactions)
+        return msg
+
+    async def save_message(self, message: discord.Message, toxic_dict: dict = {}) -> bool:
         db_has_msg = self.fetch_message(message.id)
 
         if db_has_msg:
             return False
+        
+        reactions_dict = {"reactions": []}
+        for r in message.reactions:
+            reactions_dict['reactions'].append(
+                {
+                    "emoji": str(r.emoji),
+                    "count": r.count,
+                    "users": [user.id for user in await r.users()]
+                })
         
         tup = ( message.id, 
                 message.author.id, 
@@ -146,11 +162,16 @@ class CRUD:
                 message.content,
                 message.created_at,
                 message.jump_url,
-                is_toxic )
+                json.dumps(reactions_dict),
+                toxic_dict['toxicity'],
+                toxic_dict['severe_toxic'],
+                toxic_dict['threat'],
+                toxic_dict['insult'],
+                toxic_dict['identity_hate'] )
         
         self.cursor.execute("""
-                            INSERT INTO messages (id, author_id, channel_id, guild_id, text, created_at, jump_url, is_toxic) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            INSERT INTO messages 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, tup)
         self.conn.commit()
         return True
@@ -177,7 +198,8 @@ def main():
     #                  )
     # db.cursor.execute("""CREATE TABLE IF NOT EXISTS reactions(
     #                      id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    #                      message_id INTEGER, 
+    #                      message_id INTEGER,
+    #                      user_id INTEGER,
     #                      emoji TEXT, 
     #                      count INTEGER
     #                      )"""
