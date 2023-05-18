@@ -87,7 +87,7 @@ class CRUD:
 	def fetch_emoji(self, reaction: discord.Reaction) -> models.Emoji:
 		sql = f"SELECT * FROM emoji_sentiments WHERE id = '{reaction.emoji.id}'" \
 			  if reaction.is_custom_emoji() \
-			  else f"SELECT * FROM emoji_sentiments WHERE id = '{sum([ord(char) for char in reaction.emoji])}'"
+			  else f"SELECT * FROM emoji_sentiments WHERE emoji = '{reaction.emoji}'"
 		
 		res = self.cursor.execute(sql).fetchone()
 		return models.Emoji(*res) if res else None
@@ -140,10 +140,11 @@ class CRUD:
 		msg.reactions = json.loads(msg.reactions)
 		return msg
 
-	async def save_message(self, message: discord.Message, toxic_dict: dict = {}) -> bool:
+	async def save_message(self, message: discord.Message, toxic_report = models.ToxicReport()) -> bool:
 		db_has_msg = self.fetch_message(message.id)
 
 		if db_has_msg:
+			print("msg already in db")
 			return False
 		
 		reactions_dict = {"reactions": []}
@@ -164,11 +165,11 @@ class CRUD:
 				message.created_at,
 				message.jump_url,
 				json.dumps(reactions_dict),
-				toxic_dict['toxicity'],
-				toxic_dict['severe_toxic'],
-				toxic_dict['threat'],
-				toxic_dict['insult'],
-				toxic_dict['identity_hate'] )
+				toxic_report.toxicity,
+				toxic_report.severe_toxicity,
+				toxic_report.threat,
+				toxic_report.insult,
+				toxic_report.identity_hate )
 		
 		self.cursor.execute("""
 							INSERT INTO messages 
@@ -181,41 +182,8 @@ class CRUD:
 
 # only for testing
 def main():
-	pass
-	# db = CRUD()
-	# call after manually changing sentiment scores in sentiments dict
-	# save_server_emoji_sentiments(db)
-
-	# db.cursor.execute("""CREATE TABLE IF NOT EXISTS guilds(
-	#                      id INTEGER PRIMARY KEY, 
-	#                      name TEXT
-	#                      )"""
-	#                  )
-	# db.cursor.execute("""CREATE TABLE IF NOT EXISTS channels(
-	#                      id INTEGER PRIMARY KEY, 
-	#                      name TEXT, 
-	#                      guild_id INTEGER
-	#                      )"""
-	#                  )
-	# db.cursor.execute("""CREATE TABLE messages (
-	# 						id INTEGER PRIMARY KEY,
-	# 						author_id TEXT,
-	# 						channel_id INTEGER,
-	# 						guild_id INTEGER,
-	# 						text TEXT,
-	# 						created_at TEXT,
-	# 						jump_url TEXT,
-	# 						reactions TEXT DEFAULT '',
-	# 						toxicity INTEGER DEFAULT 0,
-	# 						severe_toxic INTEGER DEFAULT 0,
-	# 						threat INTEGER DEFAULT 0,
-	# 						insult INTEGER DEFAULT 0,
-	# 						identity_hate INTEGER DEFAULT 0
-	# 					);"""
-	#                  )
-	# db.conn.commit()
-	# db.conn.close()
-
+    db = CRUD()
+    save_server_emoji_sentiments(db)
 
 if __name__ == "__main__":
 	main()

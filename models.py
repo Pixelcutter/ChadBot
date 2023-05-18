@@ -19,6 +19,14 @@ class User():
     toxicity_score: int = 0
 
 @dataclass
+class ToxicReport():
+    toxicity: int = 0
+    severe_toxicity: int = 0
+    threat: int = 0
+    insult: int = 0
+    identity_hate: int = 0
+
+@dataclass
 class Message():
     id: int
     author_id: str
@@ -29,7 +37,7 @@ class Message():
     jump_url: str
     reactions: str = ""
     toxicity: int = 0
-    severe_toxic: int = 0
+    severe_toxicity: int = 0
     threat: int = 0
     insult: int = 0
     identity_hate: int = 0

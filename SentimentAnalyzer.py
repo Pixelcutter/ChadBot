@@ -1,9 +1,9 @@
 import math
+import models
 from googleapiclient import discovery
 
 class Analyzer:
-    def __init__(self, db, api_key: str, threshold: float):
-        self.threshold = threshold
+    def __init__(self, db, api_key: str):
         self.db = db
         self.api_client = discovery.build(
             "commentanalyzer",
@@ -13,37 +13,39 @@ class Analyzer:
             static_discovery=False,
             )
     
-    def calculate_emoji_sentiment(self, message):
-        if len(message.reactions) == 0:
+    def calculate_emoji_sentiment(self, reactions):
+        if len(reactions) == 0:
             return 0
 
         total_score = 0
 
-        for reaction in message.reactions:
-            emoji = self.db.fetch_emoji(reaction)            
+        for reaction in reactions:
             count = reaction.count
+            emoji = self.db.fetch_emoji(reaction)            
             score = emoji.sentiment_score if emoji else 0
             total_score += (score * math.log(count + 1, 2))
     
-        return total_score / len(message.reactions)
+        return total_score / len(reactions)
     
-    def predict_message_toxicity(self, message) -> dict:
-        attributes = {
-            'TOXICITY': { 'scoreThreshold': self.threshold }, 
-            'SEVERE_TOXICITY': { 'scoreThreshold': self.threshold }, 
-            'INSULT': { 'scoreThreshold': self.threshold }, 
-            'IDENTITY_ATTACK': { 'scoreThreshold': self.threshold }, 
-            'THREAT': { 'scoreThreshold': self.threshold }
-            }
+    def predict_message_toxicity(self, message: str, threshold: float = 0.75) -> dict:
+        attributes = ["TOXICITY", "SEVERE_TOXICITY", "INSULT", "IDENTITY_ATTACK", "THREAT"]
         
         analyze_request = {
             'comment': { 'text': message },
             'languages': ["en"],
-            'requestedAttributes': attributes
+            'requestedAttributes': {attrib: { 'scoreThreshold': threshold } for attrib in attributes}
             }
 
         response = self.api_client.comments().analyze(body=analyze_request).execute()
-        return response
+        
+        re_dict = {}
+        for attrib in attributes:
+            if "attributeScores" in response and attrib in response['attributeScores']:
+                re_dict[attrib.lower()] = 1
+            else:
+                re_dict[attrib.lower()] = 0
+
+        return models.ToxicReport(*re_dict.values())
 
 
 def main():

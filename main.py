@@ -5,6 +5,7 @@ import os
 import sqlite3
 import SentimentAnalyzer
 import ChadbotCRUD
+import models
 
 dotenv.load_dotenv()
 
@@ -23,17 +24,17 @@ class Message:
 
 intents = discord.Intents.default()
 intents.message_content = True
-toxic_threshold = 0.6
 db = ChadbotCRUD.CRUD()
-analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"), threshold=toxic_threshold)
+analyzer = SentimentAnalyzer.Analyzer(db=db, api_key=os.getenv("API_KEY"))
 
 client = commands.Bot(command_prefix='!', intents=intents)
 
-async def send_toxicity_report(message: discord.Message, predictions: dict):
+async def send_toxicity_report(message: discord.Message, toxic_report: models.ToxicReport):
 	embed_var = discord.Embed(title="🚨 TOXIC COMMENT ALERT! 🚨", color=0xE31E33)
 	embed_var.url = "https://www.verywellmind.com/mental-health-effects-of-reading-negative-comments-online-5090287"
-	for key, val in predictions.items():
-		embed_var.add_field(name=f"{key.replace('_', ' ').title()}  ✅", value="")
+	for field, val in toxic_report.__dict__.items():
+		if val == True:
+			embed_var.add_field(name=f"{field.replace('_', ' ').title()}  ✅", value="")
 	await message.reply(embed=embed_var)
 
 
@@ -64,28 +65,17 @@ async def on_message(message):
 	if message.author == client.user:
 		return
 
-	# if client.user in message.mentions:
-	# 	await message.channel.send('sup?')
-
 	# checks incoming messages for toxicity and prints a report if they are
 	if message.content.startswith("!") == False:
-		toxicity_prediction = analyzer.predict_message_toxicity(message.content)
-		if len(toxicity_prediction["attributeScores"]) > 0:
+		toxic_report = analyzer.predict_message_toxicity(message.content)
+		print(toxic_report)
+		if toxic_report.toxicity == True:
 			await message.add_reaction("☣️")
-			toxic_dict = {}
-			for key, val in toxicity_prediction['attributeScores'].items():
-				toxic_dict[key.lower()] = 1 if val['summaryScore']['value'] > toxic_threshold else 0
-			await db.save_message(message, toxic_dict=toxic_dict)
-			# await send_toxicity_report(message, toxicity_prediction["attributeScores"])
-			
-		
+			await db.save_message(message, toxic_report=toxic_report)
+			# await send_toxicity_report(message, toxic_report)
 
 	# Run commands with the message
 	await client.process_commands(message)
-
-	# Dar targeting code
-	# if str(message.author) == "darr#1908":
-	#     await message.add_reaction("<:dar:799348728632705064>")
 
 # grabs server specific emojis and saves them to database table: emoji_sentiments
 @client.command(name='emojis')
@@ -109,32 +99,19 @@ async def rate_command(ctx):
 		return 
 	
 	original_msg = await ctx.fetch_message(ref.message_id)
-	score = analyzer.calculate_emoji_sentiment(original_msg)
+	score = analyzer.calculate_emoji_sentiment(original_msg.reactions)
 	await ctx.send(get_rating_message(score))
 
 # Test function. Put whatever you want in here
 @client.command(name="test")
 async def test(ctx):
-	toxic_dict = {}
-	toxic_dict['toxicity'] = 1
-	toxic_dict['severe_toxic'] = 1
-	toxic_dict['threat'] = 1
-	toxic_dict['insult'] = 1
-	toxic_dict['identity_hate'] = 1
-
+	toxic_report = models.ToxicReport()
 	og = await ctx.fetch_message(ctx.message.reference.message_id)
-	await db.save_message(og, toxic_dict)
+	await db.save_message(og)
 	
 
 @client.command(name='scan')
 async def scan_command(ctx, *channel_names):
-	toxic_dict = {
-		'toxicity': 0,
-		'severe_toxic': 0,
-		'threat': 0,
-		'insult': 0,
-		'identity_hate': 0
-	}
 	for channel_name in channel_names:
 		channel = discord.utils.get(ctx.guild.channels, name=channel_name)
 		if channel is None:
@@ -143,7 +120,7 @@ async def scan_command(ctx, *channel_names):
 		try:
 			# NO LIMIT - WILL SAVE EVERY MESSAGE IN A CHANNEL
 			async for message in channel.history(limit=None):
-				await db.save_message(message, toxic_dict)
+				await db.save_message(message)
 		except Exception as error:
 			print(f"Error retrieving history for channel {channel_name}: {error}")
 			await ctx.send(f"Error retrieving history for channel {channel_name}")
