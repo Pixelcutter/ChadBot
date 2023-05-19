@@ -110,24 +110,53 @@ class CRUD:
 		self.conn.commit()
 		return True
 
-	def fetch_user(self, user_id: int) -> models.User:
+	async def fetch_user(self, user_id: int) -> models.User:
 		sql = f"SELECT * FROM users WHERE id = '{user_id}'"        
 		res = self.cursor.execute(sql).fetchone()
 		return models.User(*res) if res else None
 
-	def save_user(self, user: models.User, msg_count: int = 0, toxic_msg_count: int = 0, toxicity_score: int = 0) -> bool:
-		db_has_user = self.fetch_user(user.id)
+	async def save_user(self, user: models.User) -> bool:
+		db_has_user = await self.fetch_user(user.id)
 
 		if db_has_user:
 			return False
-		
-		tup = (user.id, user.name, user.display_avatar, msg_count, toxic_msg_count, toxicity_score)
-		self.cursor.execute("""
-							INSERT INTO users (id, name, display_avatar, msg_count, toxic_msg_count, toxicity_score) 
-							VALUES (?, ?, ?, ?, ?, ?)
-							""", tup)
-		self.conn.commit()
-		return True
+		try:
+			tup = (user.id, user.name, user.display_avatar, user.msg_count, user.toxic_flags_count, user.toxicity_score)
+			self.cursor.execute("""
+								INSERT INTO users (id, name, display_avatar, msg_count, toxic_flags_count, toxicity_score) 
+								VALUES (?, ?, ?, ?, ?, ?)
+								""", tup)
+			self.conn.commit()
+			return True
+		except Exception as error:
+			print(f"Error saving message: {str(error)}")
+			return False
+
+	async def update_user(self, user: models.User) -> bool:
+		try:
+			self.cursor.execute("""
+				UPDATE users
+				SET id = ?,
+					name = ?,
+					display_avatar = ?,
+					msg_count = ?,
+					toxic_flags_count = ?,
+					toxicity_score = ?
+				WHERE id = ?;
+			""", (
+				user.id,
+				user.name,
+				user.display_avatar,
+				user.msg_count,
+				user.toxic_flags_count,
+				user.toxicity_score,
+				user.id
+			))
+			self.conn.commit()
+			return True
+		except Exception as error:
+			print(f"Error updating user: {str(error)}")
+			return False
 
 	def fetch_message(self, msg_id: int) -> models.Message:
 		sql = f"SELECT * FROM messages WHERE id = '{msg_id}'"        
@@ -140,27 +169,51 @@ class CRUD:
 		msg.reactions = json.loads(msg.reactions)
 		return msg
 
-	async def save_message(self, message: discord.Message, toxic_report = models.ToxicReport()) -> bool:
-		db_has_msg = self.fetch_message(message.id)
+	# Get every message for a specific user
+	def fetch_user_messages(self, author_id: str) -> list[models.Message]:
+		sql = f"SELECT * FROM messages WHERE author_id = '{author_id}'"
+		res = self.cursor.execute(sql).fetchall()
+		
+		messages = []
+		for row in res:
+			messages.append(models.Message(*row))
+		
+		return messages
 
+	# Create a list of all unique users and get every message for every user
+	def fetch_messages_by_user(self) -> dict[str, list[models.Message]]:
+		sql = "SELECT DISTINCT author_id FROM messages"
+		res = self.cursor.execute(sql).fetchall()
+		
+		messages_by_author = {}
+		for row in res:
+			author_id = row[0]
+			messages = self.fetch_user_messages(author_id)
+			messages_by_author[author_id] = messages
+		
+		return messages_by_author
+
+	async def save_message(self, message: discord.Message, toxic_report=models.ToxicReport()) -> bool:
+		db_has_msg = self.fetch_message(message.id)
 		if db_has_msg:
-			print("msg already in db")
+			print(f"Message {message.id} already in the database")
 			return False
-		
-		reactions_dict = {"reactions": []}
-		for r in message.reactions:
-			users = r.users()
-			reactions_dict['reactions'].append(
-				{
-					"emoji": str(r.emoji),
-					"count": r.count,
-					"users": [user.id async for user in users]
-				})
-		
-		tup = ( message.id, 
-				message.author.id, 
-				message.channel.id, 
-				message.channel.guild.id, 
+
+		try:
+			reactions_dict = {"reactions": []}
+			for r in message.reactions:
+				users = r.users()
+				reactions_dict['reactions'].append(
+					{
+						"emoji": str(r.emoji),
+						"count": r.count,
+						"users": [user.id async for user in users]
+					})
+
+			tup = (message.id,
+				message.author.id,
+				message.channel.id,
+				message.channel.guild.id,
 				message.content,
 				message.created_at,
 				message.jump_url,
@@ -169,21 +222,102 @@ class CRUD:
 				toxic_report.severe_toxicity,
 				toxic_report.threat,
 				toxic_report.insult,
-				toxic_report.identity_hate )
-		
-		self.cursor.execute("""
-							INSERT INTO messages 
-							VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-							""", tup)
-		self.conn.commit()
-		return True
+				toxic_report.identity_hate,
+				0)
 
+			self.cursor.execute("""
+								INSERT INTO messages 
+								VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+								""", tup)
+			self.conn.commit()
+			print(f"Message {message.id} was saved to the database")
+			return True
+		except Exception as error:
+			print(f"Error saving message: {str(error)}")
+			return False
+		
+	async def update_message(self, message: models.Message) -> bool:
+		try:
+			self.cursor.execute("""
+				UPDATE messages
+				SET id = ?,
+					author_id = ?,
+					channel_id = ?,
+					guild_id = ?,
+					text = ?,
+					created_at = ?,
+					jump_url = ?,
+					reactions = ?,
+					toxicity = ?,
+					severe_toxicity = ?,
+					threat = ?,
+					insult = ?,
+					identity_hate = ?,
+					was_analyzed = ?
+				WHERE id = ?;
+			""", (
+				message.id,
+				message.author_id,
+				message.channel_id,
+				message.guild_id,
+				message.text,
+				message.created_at,
+				message.jump_url,
+				message.reactions,
+				message.toxicity,
+				message.severe_toxicity,
+				message.threat,
+				message.insult,
+				message.identity_hate,
+				message.was_analyzed,
+				message.id
+			))
+			self.conn.commit()
+			return True
+		except Exception as error:
+			print(f"Error updating message: {str(error)}")
+			return False
 	
 
 # only for testing
 def main():
-    db = CRUD()
-    save_server_emoji_sentiments(db)
+	db = CRUD()
+	#save_server_emoji_sentiments(db)
+	# db.cursor.execute("""CREATE TABLE users (
+	# 					    id INTEGER PRIMARY KEY,
+	# 					    name TEXT NOT NULL,
+	# 					    display_avatar TEXT NOT NULL,
+	# 					    msg_count INTEGER DEFAULT 0,
+	# 					    toxic_flags_count INTEGER DEFAULT 0,
+	# 					    toxicity_score INTEGER DEFAULT 0
+	# 					);
+	# 				"""
+	# 				 )
+	# db.cursor.execute("""CREATE TABLE messages (
+	# 					id INTEGER PRIMARY KEY,
+	# 					author_id INTEGER,
+	# 					channel_id INTEGER,
+	# 					guild_id INTEGER,
+	# 					text TEXT,
+	# 					created_at TEXT,
+	# 					jump_url TEXT,
+	# 					reactions TEXT DEFAULT "",
+	# 					toxicity INTEGER DEFAULT 0,
+	# 					severe_toxicity INTEGER DEFAULT 0,
+	# 					threat INTEGER DEFAULT 0,
+	# 					insult INTEGER DEFAULT 0,
+	# 					identity_hate INTEGER DEFAULT 0,
+	# 					was_analyzed INTEGER DEFAULT 0,
+	# 					FOREIGN KEY (author_id) REFERENCES users (id)
+	# 				);
+	# 				"""
+	# 				 )
+	# db.cursor.execute("""DROP TABLE IF EXISTS messages;
+	# 				"""
+	# 				 )
+	db.conn.commit()
+	db.conn.close()
+
 
 if __name__ == "__main__":
 	main()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+import asyncio
 @dataclass
 class Emoji():
     id: int
@@ -15,7 +15,7 @@ class User():
     name: str
     display_avatar: str
     msg_count: int = 0
-    toxic_msg_count: int = 0
+    toxic_flags_count: int = 0
     toxicity_score: int = 0
 
 @dataclass
@@ -25,11 +25,20 @@ class ToxicReport():
     threat: int = 0
     insult: int = 0
     identity_hate: int = 0
+    # Make ToxicReport class able to be asynchronous
+    def __await__(self):
+        return self._async_generator().__await__()
+
+    # What actually happens when await is called
+    # Waits for 1 second 
+    async def _async_generator(self):
+        await asyncio.sleep(1)  
+        return self
 
 @dataclass
 class Message():
     id: int
-    author_id: str
+    author_id: int
     channel_id: int
     guild_id: int
     text: str
@@ -41,4 +50,5 @@ class Message():
     threat: int = 0
     insult: int = 0
     identity_hate: int = 0
+    was_analyzed: int = 0
 

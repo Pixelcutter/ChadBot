@@ -6,6 +6,10 @@ import sqlite3
 import SentimentAnalyzer
 import ChadbotCRUD
 import models
+import time
+import asyncio
+import random
+import googleapiclient
 
 dotenv.load_dotenv()
 
@@ -67,7 +71,7 @@ async def on_message(message):
 
 	# checks incoming messages for toxicity and prints a report if they are
 	if message.content.startswith("!") == False:
-		toxic_report = analyzer.predict_message_toxicity(message.content)
+		toxic_report = await analyzer.predict_message_toxicity(message.content)
 		print(toxic_report)
 		if toxic_report.toxicity == True:
 			await message.add_reaction("☣️")
@@ -103,27 +107,105 @@ async def rate_command(ctx):
 	await ctx.send(get_rating_message(score))
 
 # Test function. Put whatever you want in here
-@client.command(name="test")
-async def test(ctx):
-	toxic_report = models.ToxicReport()
-	og = await ctx.fetch_message(ctx.message.reference.message_id)
-	await db.save_message(og)
+# @client.command(name="test")
+# async def test(ctx):
+# 	toxic_report = models.ToxicReport()
+# 	og = await ctx.fetch_message(ctx.message.reference.message_id)
+# 	await db.save_message(og)
 	
+# Saves message data into the user and message tables
+@client.command(name='update')
+async def update(ctx, *channel_names):
+	# If not specified, scan every text channel
+	if not channel_names:
+		channels = [channel for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel)]
+	else:
+		channels = [discord.utils.get(ctx.guild.channels, name=channel_name) for channel_name in channel_names]
 
-@client.command(name='scan')
-async def scan_command(ctx, *channel_names):
-	for channel_name in channel_names:
-		channel = discord.utils.get(ctx.guild.channels, name=channel_name)
-		if channel is None:
-			await ctx.send(f"Cannot find channel {channel_name}")
-			continue
+	users = {}
+	historyError = False
+
+	for channel in channels:
 		try:
-			# NO LIMIT - WILL SAVE EVERY MESSAGE IN A CHANNEL
 			async for message in channel.history(limit=None):
+				# Create a dict for users, track message count
+				if message.author.id not in users:
+					user = models.User(id=message.author.id, name=str(message.author), display_avatar='', msg_count=1, toxic_flags_count=0, toxicity_score=0)
+					users[message.author.id] = user
+				else:
+					users[message.author.id].msg_count += 1
 				await db.save_message(message)
+
 		except Exception as error:
-			print(f"Error retrieving history for channel {channel_name}: {error}")
-			await ctx.send(f"Error retrieving history for channel {channel_name}")
-	await ctx.send("Scan completed for all specified channels")
+			print((f"Error retrieving history for channel {channel.name}: {error}"))
+			await ctx.send(f"Error retrieving history for channel {channel.name}")
+			error = True
+
+	for user in users.values():
+		await db.save_user(user)
+
+	if not historyError:
+		print("Update completed for all specified channels")
+		await ctx.send("Update completed for all specified channels")
+
+# Generates a report of the most toxic users
+@client.command(name='toxicity')
+async def toxicity(ctx):
+	messages_by_author = db.fetch_messages_by_user()
+	user_flags_count = {}
+	user_toxicity_score = {}
+
+	for author_id, messages in messages_by_author.items():
+		if messages:
+			user = await db.fetch_user(author_id)
+			if user is None:
+				print(f"User not found for author_id {author_id}")
+				continue
+			
+			user_flags_count[f"{author_id}_{user.name}"] = user.toxic_flags_count
+			for message in messages:
+				if message.text and message.was_analyzed == 0:
+					try:
+						toxicity_score = await analyzer.predict_message_toxicity(message.text)
+						message.was_analyzed = 1
+						try:
+							if not await db.update_message(message):
+								raise Exception("Unable to set message as 'analyzed'")
+						except Exception as error:
+							print(f"Error: {error}")
+						count = sum(
+							value == 1 for value in [
+								toxicity_score.toxicity,
+								toxicity_score.severe_toxicity,
+								toxicity_score.threat,
+								toxicity_score.insult,
+								toxicity_score.identity_hate
+							]
+						)
+						user_flags_count[f"{author_id}_{user.name}"] += count
+						print(f"Running total for user {user.name}: {user_flags_count[f'{author_id}_{user.name}']}")
+					except Exception as e:
+						print(f"Error processing message {message.id}: {str(e)}")
+				else:
+					print(f"Message {message.id} was already analyzed or is empty")
+		else:
+			print(f"No messages found for user {user.name}")
+	
+	for key, count in user_flags_count.items():
+		key_list = key.split('_')
+		author_id = key_list[0]
+		username = key_list[1]
+		user = await db.fetch_user(author_id)
+		if user is None:
+			print(f"User not found for author_id {author_id}")
+			continue
+		user.toxic_flags_count = count
+		user.toxicity_score = count / (5 * user.msg_count)
+		user_toxicity_score[username] = count / (5 * user.msg_count)
+		print(user)
+		await db.update_user(user)  # Save the updated toxicity score in the user database
+
+	print(user_toxicity_score)  # Toxicity score of each user based on flags count and message count
+	await ctx.send(user_toxicity_score)
 
 client.run(os.getenv('TOKEN'))

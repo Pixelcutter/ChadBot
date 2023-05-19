@@ -27,7 +27,7 @@ class Analyzer:
     
         return total_score / len(reactions)
     
-    def predict_message_toxicity(self, message: str, threshold: float = 0.75) -> models.ToxicReport:
+    async def predict_message_toxicity(self, message: str, threshold: float = 0.75) -> models.ToxicReport:
         attributes = ["TOXICITY", "SEVERE_TOXICITY", "INSULT", "IDENTITY_ATTACK", "THREAT"]
         
         analyze_request = {
@@ -45,7 +45,7 @@ class Analyzer:
             else:
                 re_dict[attrib.lower()] = 0
 
-        return models.ToxicReport(*re_dict.values())
+        return await models.ToxicReport(*re_dict.values())
 
 
 def main():
