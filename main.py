@@ -114,14 +114,8 @@ async def rate_command(ctx):
 # 	await db.save_message(og)
 	
 # Saves message data into the user and message tables
-@client.command(name='update')
-async def update(ctx, *channel_names):
-	# If not specified, scan every text channel
-	if not channel_names:
-		channels = [channel for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel)]
-	else:
-		channels = [discord.utils.get(ctx.guild.channels, name=channel_name) for channel_name in channel_names]
-
+async def update(ctx):
+	channels = [channel for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel)]
 	users = {}
 	historyError = False
 
@@ -138,7 +132,6 @@ async def update(ctx, *channel_names):
 
 		except Exception as error:
 			print((f"Error retrieving history for channel {channel.name}: {error}"))
-			await ctx.send(f"Error retrieving history for channel {channel.name}")
 			error = True
 
 	for user in users.values():
@@ -146,53 +139,43 @@ async def update(ctx, *channel_names):
 
 	if not historyError:
 		print("Update completed for all specified channels")
-		await ctx.send("Update completed for all specified channels")
 
-# Generates a report of the most toxic users
-@client.command(name='toxicity')
-async def toxicity(ctx):
-	messages_by_author = db.fetch_messages_by_user()
-	user_flags_count = {}
-	user_toxicity_score = {}
-
-	for author_id, messages in messages_by_author.items():
-		if messages:
-			user = await db.fetch_user(author_id)
-			if user is None:
-				print(f"User not found for author_id {author_id}")
-				continue
-			
-			user_flags_count[f"{author_id}_{user.name}"] = user.toxic_flags_count
-			for message in messages:
-				if message.text and message.was_analyzed == 0:
-					try:
-						toxicity_score = await analyzer.predict_message_toxicity(message.text)
-						message.was_analyzed = 1
-						try:
-							if not await db.update_message(message):
-								raise Exception("Unable to set message as 'analyzed'")
-						except Exception as error:
-							print(f"Error: {error}")
-						count = sum(
-							value == 1 for value in [
-								toxicity_score.toxicity,
-								toxicity_score.severe_toxicity,
-								toxicity_score.threat,
-								toxicity_score.insult,
-								toxicity_score.identity_hate
-							]
-						)
-						user_flags_count[f"{author_id}_{user.name}"] += count
-						print(f"Running total for user {user.name}: {user_flags_count[f'{author_id}_{user.name}']}")
-					except Exception as e:
-						print(f"Error processing message {message.id}: {str(e)}")
-				else:
-					print(f"Message {message.id} was already analyzed or is empty")
+async def count_toxicity(user, user_flags_count, author_id, messages):
+	user_flags_count[f"{author_id}:{user.name}"] = user.toxic_flags_count
+	for message in messages:
+		if message.text and message.was_analyzed == 0:
+			try:
+				toxicity_score = await analyzer.predict_message_toxicity(message.text)
+				message.was_analyzed = 1
+				try:
+					if not await db.update_message(message):
+						raise Exception("Unable to set message as 'analyzed'")
+				except Exception as error:
+					print(f"Error: {error}")
+				finally:
+					count = sum(
+						value == 1 for value in [
+							toxicity_score.toxicity,
+							toxicity_score.severe_toxicity,
+							toxicity_score.threat,
+							toxicity_score.insult,
+							toxicity_score.identity_hate
+						]
+					)
+				user_flags_count[f"{author_id}:{user.name}"] += count
+				print(f"Running total for user {user.name}: {user_flags_count[f'{author_id}:{user.name}']}")
+			except Exception as error:
+				print(f"Error processing message {message.id}: {str(error)}")
 		else:
-			print(f"No messages found for user {user.name}")
-	
+			print(f"Message {message.id} was already analyzed or is empty")
+	return user_flags_count
+
+# Calculate a user's "toxicity score" based on the # of toxic flags they accrued
+# Updates user_flags_count dict so no need to return it
+async def calculate_toxicity_score(user_flags_count):
+	user_toxicity_scores = {}
 	for key, count in user_flags_count.items():
-		key_list = key.split('_')
+		key_list = key.split(':')
 		author_id = key_list[0]
 		username = key_list[1]
 		user = await db.fetch_user(author_id)
@@ -200,12 +183,45 @@ async def toxicity(ctx):
 			print(f"User not found for author_id {author_id}")
 			continue
 		user.toxic_flags_count = count
-		user.toxicity_score = count / (5 * user.msg_count)
-		user_toxicity_score[username] = count / (5 * user.msg_count)
-		print(user)
-		await db.update_user(user)  # Save the updated toxicity score in the user database
+		raw_score = (count / (5 * user.msg_count)) * 100
+		user.toxicity_score = raw_score
+		user_toxicity_scores[username] = round(raw_score, 2) # Round to 2 decimal places for message output
+		await db.update_user(user)
 
-	print(user_toxicity_score)  # Toxicity score of each user based on flags count and message count
-	await ctx.send(user_toxicity_score)
+# Create an embed that ranks user's for output to Discord
+def create_toxicity_embed(server_name, user_toxicity_scores):
+	# Lambda sort dictionary (based on toxicity score)
+	sorted_scores = sorted(user_toxicity_scores.items(), key=lambda x: x[1], reverse=True)
+	embed = discord.Embed(title=f"☠️ Most toxic users in {server_name} ☠️", color=discord.Color.from_str("#39FF14"))
+
+	# Start assigning rank to scores starting at 1 
+	for rank, (user, score) in enumerate(sorted_scores, start=1):
+		# If score is of format 'x.0' don't show decimal
+		if score % 1 == 0:
+			score = int(score)
+		embed.add_field(name=f"{rank}. {user}", value=f"{score}% toxic", inline=False)
+
+	return embed
+
+# Generates a report of the most toxic users
+@client.command(name='toxicity')
+async def toxicity(ctx):
+	# Update before generating report
+	await update(ctx)
+
+	message_dict = db.fetch_messages_by_user()
+	user_flags_count = {}
+	for author_id, messages in message_dict.items():
+		if messages:
+			user = await db.fetch_user(author_id)
+			if user is None:
+				print(f"User not found for author_id {author_id}")
+				continue
+			await count_toxicity(user, user_flags_count, author_id, messages)
+		else:
+			print(f"No messages found for user {user.name}")
+	user_toxicity_scores = await calculate_toxicity_score(user_flags_count)
+	print(user_toxicity_scores)
+	await ctx.send(embed=create_toxicity_embed(ctx.guild.name, user_toxicity_scores))
 
 client.run(os.getenv('TOKEN'))

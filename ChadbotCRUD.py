@@ -179,16 +179,29 @@ class CRUD:
 			messages.append(models.Message(*row))
 		
 		return messages
+	
+	# Get every message for a specific user matching that channel
+	def fetch_user_messages_by_channel_name(self, author_id: str, channel_ids: list[int]) -> list[models.Message]:
+		messages = []
+		for channel_id in channel_ids:
+			sql = f"SELECT * FROM messages WHERE author_id = '{author_id}' AND channel_id = '{channel_id}'"
+			res = self.cursor.execute(sql).fetchall()
+			messages = [models.Message(*row) for row in res]
+			
+		return messages
 
 	# Create a list of all unique users and get every message for every user
-	def fetch_messages_by_user(self) -> dict[str, list[models.Message]]:
+	def fetch_messages_by_user(self, channel_ids=None) -> dict[str, list[models.Message]]:
 		sql = "SELECT DISTINCT author_id FROM messages"
 		res = self.cursor.execute(sql).fetchall()
 		
 		messages_by_author = {}
 		for row in res:
 			author_id = row[0]
-			messages = self.fetch_user_messages(author_id)
+			if not channel_ids:
+				messages = self.fetch_user_messages(author_id)
+			else:
+				messages = self.fetch_user_messages_by_channel_name(author_id, channel_ids)
 			messages_by_author[author_id] = messages
 		
 		return messages_by_author
