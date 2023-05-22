@@ -28,6 +28,10 @@ class Analyzer:
         return total_score / len(reactions)
     
     async def predict_message_toxicity(self, message: str, threshold: float = 0.75) -> models.ToxicReport:
+        # no reason to call perspective API if the message is empty
+        if message == "":
+            return models.ToxicReport()
+        
         attributes = ["TOXICITY", "SEVERE_TOXICITY", "INSULT", "IDENTITY_ATTACK", "THREAT"]
         
         analyze_request = {
