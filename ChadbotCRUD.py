@@ -169,9 +169,9 @@ class CRUD:
 		msg.reactions = json.loads(msg.reactions)
 		return msg
 
-	# Get every message for a specific user
-	def fetch_user_messages(self, author_id: str) -> list[models.Message]:
-		sql = f"SELECT * FROM messages WHERE author_id = '{author_id}'"
+	# Get every message for a specific user in the server
+	def fetch_user_messages(self, author_id: int, guild_id: int) -> list[models.Message]:
+		sql = f"SELECT * FROM messages WHERE author_id = {author_id} AND guild_id={guild_id}"
 		res = self.cursor.execute(sql).fetchall()
 		
 		messages = []
@@ -181,27 +181,24 @@ class CRUD:
 		return messages
 	
 	# Get every message for a specific user matching that channel
-	def fetch_user_messages_by_channel_name(self, author_id: str, channel_ids: list[int]) -> list[models.Message]:
-		messages = []
-		for channel_id in channel_ids:
-			sql = f"SELECT * FROM messages WHERE author_id = '{author_id}' AND channel_id = '{channel_id}'"
-			res = self.cursor.execute(sql).fetchall()
-			messages = [models.Message(*row) for row in res]
+	# def fetch_user_messages_by_channel_name(self, author_id: int, channel_ids: list[int]) -> list[models.Message]:
+	# 	messages = []
+	# 	for channel_id in channel_ids:
+	# 		sql = f"SELECT * FROM messages WHERE author_id = '{author_id}' AND channel_id = '{channel_id}'"
+	# 		res = self.cursor.execute(sql).fetchall()
+	# 		messages = [models.Message(*row) for row in res]
 			
-		return messages
+	# 	return messages
 
 	# Create a list of all unique users and get every message for every user
-	def fetch_messages_by_user(self, channel_ids=None) -> dict[str, list[models.Message]]:
-		sql = "SELECT DISTINCT author_id FROM messages"
+	def fetch_messages_by_user(self, guild_id: int) -> dict[str, list[models.Message]]:
+		sql = f"SELECT DISTINCT author_id FROM messages"
 		res = self.cursor.execute(sql).fetchall()
 		
 		messages_by_author = {}
 		for row in res:
 			author_id = row[0]
-			if not channel_ids:
-				messages = self.fetch_user_messages(author_id)
-			else:
-				messages = self.fetch_user_messages_by_channel_name(author_id, channel_ids)
+			messages = self.fetch_user_messages(author_id, guild_id)
 			messages_by_author[author_id] = messages
 		
 		return messages_by_author

@@ -214,7 +214,7 @@ async def toxicity(ctx):
 	# Update before generating report
 	await update(ctx)
 
-	message_dict = db.fetch_messages_by_user()
+	message_dict = db.fetch_messages_by_user(ctx.guild.id)
 	user_flags_count = {}
 	for author_id, messages in message_dict.items():
 		if messages:
