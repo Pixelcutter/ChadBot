@@ -176,7 +176,6 @@ async def count_toxicity(user, user_flags_count, author_id, messages):
 	return user_flags_count
 
 # Calculate a user's "toxicity score" based on the # of toxic flags they accrued
-# Updates user_flags_count dict so no need to return it
 async def calculate_toxicity_score(user_flags_count):
 	user_toxicity_scores = {}
 	for key, count in user_flags_count.items():
@@ -192,6 +191,7 @@ async def calculate_toxicity_score(user_flags_count):
 		user.toxicity_score = raw_score
 		user_toxicity_scores[username] = round(raw_score, 2) # Round to 2 decimal places for message output
 		await db.update_user(user)
+	return user_toxicity_scores
 
 # Create an embed that ranks user's for output to Discord
 def create_toxicity_embed(server_name, user_toxicity_scores):
@@ -225,8 +225,13 @@ async def toxicity(ctx):
 			await count_toxicity(user, user_flags_count, author_id, messages)
 		else:
 			print(f"No messages found for user {user.name}")
+	print("user flags dict",user_flags_count)
 	user_toxicity_scores = await calculate_toxicity_score(user_flags_count)
-	print(user_toxicity_scores)
-	await ctx.send(embed=create_toxicity_embed(ctx.guild.name, user_toxicity_scores))
+	print("user toxicity scores:",user_toxicity_scores)
+	if not user_toxicity_scores:
+		print("No toxicity scores found")
+		await ctx.send("No toxicity scores found")
+	else:
+		await ctx.send(embed=create_toxicity_embed(ctx.guild.name, user_toxicity_scores))
 
 client.run(os.getenv('TOKEN'))

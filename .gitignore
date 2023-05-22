@@ -4,3 +4,4 @@ venv/
 __pycache__/
 tmp.py
 test.db
+chadbot_ec2.pem

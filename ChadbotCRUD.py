@@ -236,7 +236,7 @@ class CRUD:
 				toxic_report.threat,
 				toxic_report.insult,
 				toxic_report.identity_hate,
-				1)
+				0)
 
 			self.cursor.execute("""
 								INSERT INTO messages 
@@ -325,7 +325,7 @@ def main():
 	# 				);
 	# 				"""
 	# 				 )
-	# db.cursor.execute("""DROP TABLE IF EXISTS messages;
+	# db.cursor.execute("""DROP TABLE IF EXISTS users;
 	# 				"""
 	# 				 )
 	db.conn.commit()
