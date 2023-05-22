@@ -120,7 +120,7 @@ async def update(ctx):
 
 	for channel in channels:
 		try:
-			async for message in channel.history(limit=None):
+			async for message in channel.history(limit=10000):
 				# Create a dict for users, track message count
 				if message.author.id not in users:
 					user = models.User(id=message.author.id, name=str(message.author), display_avatar='', msg_count=1, toxic_flags_count=0, toxicity_score=0)
