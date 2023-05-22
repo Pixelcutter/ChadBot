@@ -236,7 +236,7 @@ class CRUD:
 				toxic_report.threat,
 				toxic_report.insult,
 				toxic_report.identity_hate,
-				0)
+				1)
 
 			self.cursor.execute("""
 								INSERT INTO messages 

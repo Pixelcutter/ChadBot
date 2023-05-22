@@ -9,7 +9,6 @@ import models
 import time
 import asyncio
 import random
-import googleapiclient
 
 dotenv.load_dotenv()
 
@@ -75,7 +74,7 @@ async def on_message(message):
 		print(toxic_report)
 		if toxic_report.toxicity == True:
 			await message.add_reaction("☣️")
-			await db.save_message(message, toxic_report=toxic_report)
+		await db.save_message(message, toxic_report=toxic_report)
 			# await send_toxicity_report(message, toxic_report)
 
 	# Run commands with the message
@@ -146,7 +145,13 @@ async def count_toxicity(user, user_flags_count, author_id, messages):
 		if message.text and message.was_analyzed == 0:
 			try:
 				toxicity_score = await analyzer.predict_message_toxicity(message.text)
-				message.was_analyzed = 1
+				message.was_analyzed = 1                                                                             
+				message.toxicity = toxicity_score.toxicity                                                              
+				message.severe_toxicity = toxicity_score.severe_toxicity                                                
+				message.threat = toxicity_score.threat                                                                  
+				message.insult = toxicity_score.insult                                                                  
+				message.identity_hate = toxicity_score.identity_hate
+
 				try:
 					if not await db.update_message(message):
 						raise Exception("Unable to set message as 'analyzed'")
