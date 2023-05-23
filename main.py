@@ -211,27 +211,31 @@ def create_toxicity_embed(server_name, user_toxicity_scores):
 # Generates a report of the most toxic users
 @client.command(name='toxicity')
 async def toxicity(ctx):
-	# Update before generating report
-	await update(ctx)
+    # Update before generating report
+    await update(ctx)
 
-	message_dict = db.fetch_messages_by_user(ctx.guild.id)
-	user_flags_count = {}
-	for author_id, messages in message_dict.items():
-		if messages:
-			user = await db.fetch_user(author_id)
-			if user is None:
-				print(f"User not found for author_id {author_id}")
-				continue
-			await count_toxicity(user, user_flags_count, author_id, messages)
-		else:
-			print(f"No messages found for user {user.name}")
-	print("user flags dict",user_flags_count)
-	user_toxicity_scores = await calculate_toxicity_score(user_flags_count)
-	print("user toxicity scores:",user_toxicity_scores)
-	if not user_toxicity_scores:
-		print("No toxicity scores found")
-		await ctx.send("No toxicity scores found")
-	else:
-		await ctx.send(embed=create_toxicity_embed(ctx.guild.name, user_toxicity_scores))
+    message_dict = db.fetch_messages_by_user(ctx.guild.id)
+    user_flags_count = {}
+    for author_id, messages in message_dict.items():
+        user = None
+        if messages:
+            user = await db.fetch_user(author_id)
+            if user is None:
+                print(f"User not found for author_id {author_id}")
+                continue
+            await count_toxicity(user, user_flags_count, author_id, messages)
+        else:
+            if user is None:
+                print(f"No messages or user found")
+            else:
+                print(f"No messages found for user {user.name}")
+    user_toxicity_scores = await calculate_toxicity_score(user_flags_count)
+    if not user_toxicity_scores:
+        print("No toxicity scores found")
+        await ctx.send("No toxicity scores found")
+    else:
+        print(user_toxicity_scores)
+        await ctx.send(embed=create_toxicity_embed(ctx.guild.name, user_toxicity_scores))
+
 
 client.run(os.getenv('TOKEN'))
