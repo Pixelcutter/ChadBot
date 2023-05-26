@@ -41,22 +41,22 @@ async def send_toxicity_report(message: discord.Message, toxic_report: models.To
 	await message.reply(embed=embed_var)
 
 
-# dumb function that returns a fixed message based on rating
+# Returns sentiment score and sentiment in english
 def get_rating_message(rating):
 	msg = ""
 	if rating >= -0.6 and rating <= 0.6:
-		msg = "Average take..."
+		msg = "Neutral"
 	elif rating < -0.6:
 		if rating > -0.9:
-			msg = "Bad take"
+			msg = "Negative"
 		else:
-			msg = "Shit take. Consider deleting message"
+			msg = "Very negative"
 	else:
 		if rating < 0.9:
-			msg = "Good take"
+			msg = "Positive"
 		else:
-			msg = "God-tier take. Pin it"
-	return msg
+			msg = "Very positive"
+	return f"{msg}: {round(rating,2)}"
 
 @client.event
 async def on_ready():
@@ -94,7 +94,7 @@ async def get_emojis(ctx):
 
 
 # command that rates a channel message thats been replied to by its reactions
-@client.command(name='rate')
+@client.command(name='analyze')
 async def rate_command(ctx):
 	ref = ctx.message.reference
 	if ref == None:
